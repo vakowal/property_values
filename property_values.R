@@ -47,15 +47,6 @@ values_subs <- values_appraisal_years_unique[
   values_appraisal_years_unique$PIN %in% prop_val_PIN_list, ]
 values_subs$total_val <- values_subs$LandVal + values_subs$BldgVal
 
-# isolate class codes appearing in Emma
-class_codes <- read.csv("D:/PODER_Emma/Property_values/Buncombe_class_codes.csv")
-parcels_Emma <- merge(
-  parcels_df, class_codes, by.x='Class', by.y='CODE', all.x=TRUE)
-class_codes_Emma <- parcels_Emma[
-  !duplicated(parcels_Emma$Class), c('Class', 'Description', 'Ginger_class')]
-# class codes appearing in Emma, most inclusive parcel list (intersects 0.25 mile buffer)
-write.csv(class_codes_Emma, "D:/PODER_Emma/Property_values/Emma_unique_class_codes.csv")
-
 # change in quartile bins over time
 df_list = list()
 for(year in appraisal_years) {
@@ -240,3 +231,13 @@ class_codes <- read.csv("D:/PODER_Emma/Property_values/Buncombe_class_codes.csv"
 # vacant properties -> Ginger_class == 'vacant'
 # rental properties -> Ginger_class == ??
 # residential with an LLC type name -> Ginger_class == 'residential' && Owner.endswith('LLC')
+
+# obsolete snippets
+# isolate class codes appearing in Emma
+class_codes <- read.csv("D:/PODER_Emma/Property_values/Buncombe_class_codes.csv")
+parcels_Emma <- merge(
+  parcels_df, class_codes, by.x='Class', by.y='CODE', all.x=TRUE)
+class_codes_Emma <- parcels_Emma[
+  !duplicated(parcels_Emma$Class), c('Class', 'Description', 'Ginger_class')]
+# class codes appearing in Emma, most inclusive parcel list (intersects 0.25 mile buffer)
+write.csv(class_codes_Emma, "D:/PODER_Emma/Property_values/Emma_unique_class_codes.csv")
