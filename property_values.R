@@ -83,15 +83,15 @@ num_prop_df <- reshape(
   direction='long')
 
 num_prop_df$quartile <- factor(
-  num_prop_df$quartile, levels=c('q1', 'q2', 'q3', 'q4'),
-  labels=c('q1 ($0 - $53,100)', 'q2 ($53,100 - $100,300)',
-           'q3 ($100,300 - $147,300)', 'q4 ($147,300 - $23,100,000)'))
+  num_prop_df$quartile, levels=c('q4', 'q3', 'q2', 'q1'),
+  labels=c('q4 ($147,300 - $23,100,000)', 'q3 ($100,300 - $147,300)',
+           'q2 ($53,100 - $100,300)', 'q1 ($0 - $53,100)'))
 p <- ggplot(num_prop_df, aes(fill=quartile, y=num, x=year))
-p <- p + geom_bar(position="fill", stat="identity")
+p <- p + geom_bar(position="stack", stat="identity")  # position="stack" for number, position="fill" for percent
 p <- p + xlab("Year") + ylab("% parcels")
 p <- p + scale_x_continuous(breaks=c(2005, 2009, 2013, 2017))
 print(p)
-pngname <- "D:/PODER_Emma/Results/percent_residential_parcel_in_quantile_by_year.png"
+pngname <- "D:/PODER_Emma/Results/num_residential_parcel_in_quantile_by_year.png"
 png(filename=pngname, width=5, height=3, units='in', res=300)
 print(p)
 dev.off()
