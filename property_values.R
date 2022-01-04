@@ -3,8 +3,8 @@ library(ggplot2)
 library(dplyr)
 
 summ_fun <- function(x) {
-  c(min = min(x), max = max(x), 
-    mean = mean(x), median = median(x), 
+  c(min = min(x), max = max(x),
+    mean = mean(x), median = median(x),
     std = sd(x), count=length(x))
 }
 
@@ -23,11 +23,11 @@ relative_to_2005 <- function(df) {
 appraisal_years <- c(2017, 2013, 2009, 2005)
 
 # property values in Emma over time
-values_df <- read.csv("D:/PODER_Emma/Property_values/Real_Estate_Appraisal_Tax_History_2019.csv")
+values_df <- read.csv("C:/Users/ginge/Documents/PODER_Emma/Property_values/Real_Estate_Appraisal_Tax_History_2019.csv")
 colnames(values_df)[1] <- 'PIN'
 
 # parcel PINs by intersection with Emma neighborhood and buffer
-parcels_df <- read.csv("D:/PODER_Emma/Property_values/Parcels_by_intersection_Emma_and_buffer.csv")
+parcels_df <- read.csv("C:/Users/ginge/Documents/PODER_Emma/Property_values/Parcels_by_intersection_Emma_and_buffer.csv")
 
 # properties inside Emma 1/4 mile buffer
 parcels_subs <- parcels_df[, c(
@@ -49,7 +49,7 @@ values_subs <- values_appraisal_years_unique[
 values_subs$total_val <- values_subs$LandVal + values_subs$BldgVal
 
 # residential property value quartiles
-codes_df <- read.csv("D:/PODER_Emma/Property_values/Emma_unique_class_codes.csv")
+codes_df <- read.csv("C:/Users/ginge/Documents/PODER_Emma/Property_values/Emma_unique_class_codes.csv")
 parcels_codes <- merge(parcels_subs, codes_df, by='Class')
 residential_parcels <- parcels_codes[
   parcels_codes$Ginger_class == 'residential', 'PIN']
@@ -82,16 +82,16 @@ num_prop_df <- reshape(
   timevar='quartile', times=c('q1', 'q2', 'q3', 'q4'), idvar='year',
   direction='long')
 
-num_prop_df$quartile <- factor(
+num_prop_df$Parcel_value <- factor(
   num_prop_df$quartile, levels=c('q4', 'q3', 'q2', 'q1'),
-  labels=c('q4 ($147,300 - $23,100,000)', 'q3 ($100,300 - $147,300)',
-           'q2 ($53,100 - $100,300)', 'q1 ($0 - $53,100)'))
-p <- ggplot(num_prop_df, aes(fill=quartile, y=num, x=year))
-p <- p + geom_bar(position="stack", stat="identity")  # position="stack" for number, position="fill" for percent
-p <- p + xlab("Year") + ylab("% parcels")
+  labels=c('Highest ($147,300 - $23,100,000)', 'High ($100,300 - $147,300)',
+           'Low ($53,100 - $100,300)', 'Lowest ($0 - $53,100)'))
+p <- ggplot(num_prop_df, aes(fill=Parcel_value, y=num, x=year))
+p <- p + geom_bar(position="fill", stat="identity")  # position="stack" for number, position="fill" for percent
+p <- p + xlab("Year") + ylab("% parcels")  # "# parcels"
 p <- p + scale_x_continuous(breaks=c(2005, 2009, 2013, 2017))
 print(p)
-pngname <- "D:/PODER_Emma/Results/num_residential_parcel_in_quantile_by_year.png"
+pngname <- "C:/Users/ginge/Documents/PODER_Emma/Results/percent_residential_parcel_in_quantile_by_year.png"
 png(filename=pngname, width=5, height=3, units='in', res=300)
 print(p)
 dev.off()
@@ -136,7 +136,7 @@ p <- p + geom_point() + facet_wrap(~Description, scales='free')
 p <- p + geom_text(data=num_by_class, aes(x=2014, y=0, label=mean_num))
 p <- p + scale_x_continuous(breaks=c(2005, 2013))
 p <- p + ylab("Percent change from 2005")
-pngname <- "D:/PODER_Emma/Results/percent_change_total_val_residential_by_type.png"
+pngname <- "C:/Users/ginge/Documents/PODER_EmmaResults/percent_change_total_val_residential_by_type.png"
 png(filename=pngname, width=7, height=6, units='in', res=300)
 print(p)
 dev.off()
@@ -211,23 +211,62 @@ useful_cols <- c(
   'CityName', 'CareOf', 'Address')
 parcels_Emma_df <- parcels_df[
   parcels_df$Emma_nobuf == 'Emma_within', useful_cols]
-class_codes <- read.csv("D:/PODER_Emma/Property_values/Buncombe_class_codes.csv")
+class_codes <- read.csv("C:/Users/ginge/Documents/PODER_Emma/Property_values/Emma_unique_class_codes.csv")
+parcels_codes <- merge(parcels_Emma_df, class_codes, by='Class')
 
-# TODO identify investment properties
-# commercial properties -> Ginger_class == 'commercial'
-# vacant properties -> Ginger_class == 'vacant'
-# rental properties -> Ginger_class == ??
-# residential with an LLC type name -> Ginger_class == 'residential' && Owner.endswith('LLC')
+# investment properties: commercial + vacant + residential with LLC type name
+invest_prop <- rbind(
+  parcels_codes[
+    (parcels_codes$Ginger_class == 'commercial') |
+    (parcels_codes$Ginger_class == 'vacant'), ],
+  subset(parcels_codes[(parcels_codes$Ginger_class == 'residential'), ], grepl('LLC', Owner)))
+
+# duplicate owners identified inexactly, by eye
+invest_prop['Owner'][invest_prop['Owner'] == 'AOC HOLDING LLC'] <- 'AOC HOLDINGS LLC'
+invest_prop['Owner'][invest_prop['Owner'] == 'C2 INVESTMENTS LLC'] <- 'C2 HOLDING GROUP LLC'
+invest_prop['Owner'][invest_prop['Owner'] == 'C2 INVESTMENTS LLC'] <- 'C2 HOLDING GROUP LLC'
+invest_prop['Owner'][invest_prop['Owner'] == 'DJ3 LLC'] <- 'DJ3 DELAWARE LLC'
+invest_prop['Owner'][invest_prop['Owner'] == 'DR & DA INVESTMENTS INC BECKY I MARTIN & WINSTON T'] <- 'DR & DA INVESTMENTS INC'
+invest_prop['Owner'][invest_prop['Owner'] == 'DR & DA INVESTMENTS LLC;MARTIN BECKY IVESTER'] <- 'DR & DA INVESTMENTS INC'
+invest_prop['Owner'][invest_prop['Owner'] == 'WINSTON MARTIN (ETAL) DR&DA INVESTMENTS LLC'] <- 'DR & DA INVESTMENTS INC'
+invest_prop['Owner'][invest_prop['Owner'] == 'GREEN HILLS CEM ASSC INC'] <- 'GREEN HILL CEMETERY ASSOCIATION'
+invest_prop['Owner'][invest_prop['Owner'] == 'KISER INVESTMENTS OF ASHEVILLE LLC'] <- 'KISER INVESTMENTS'
+invest_prop['Owner'][invest_prop['Owner'] == 'LASHER PROPERTIES LLC DBA CREST MOUNTAIN COMMERCIAL PROP'] <- 'LASHER PROPERTIES LLC'
+invest_prop['Owner'][invest_prop['Owner'] == 'QUENTIN K MILLER ET AL'] <- 'MILLER QUENTIN K'
+invest_prop['Owner'][invest_prop['Owner'] == 'RICKER CARL H JR;RICKER JANIS L'] <- 'RICKER CARL H JR'
+invest_prop['Owner'][invest_prop['Owner'] == 'THE ROBERSON GROUP LLCD'] <- 'THE ROBERSON GROUP LLC'
+
+# sum up acreage by owner
+acreage_by_owner <- aggregate(Acreage~Owner, data=invest_prop, FUN=sum)
+
+# sum up value by owner
+values_2019 <- subset(
+  values_df, (TaxYear == 2019 & PIN %in% invest_prop$PIN),
+    select=c(PIN, Acres, LandVal, BldgVal))
+invest_prop_values <- merge(invest_prop, values_2019, by='PIN', all=TRUE)
+invest_prop_values$totalVal <- invest_prop_values$BldgVal + invest_prop_values$LandVal
+totalval_by_owner <- aggregate(totalVal~Owner, data=invest_prop_values, FUN=sum)
+landval_by_owner <- aggregate(LandVal~Owner, data=invest_prop_values, FUN=sum)
+
+# calculate rank by owner for acreage, total val, and land val
+biggest_owners <- merge(acreage_by_owner, totalval_by_owner, all=TRUE)
+biggest_owners <- merge(biggest_owners, landval_by_owner, all=TRUE)
+biggest_owners$acreage_rank <- rank(-biggest_owners$Acreage, ties.method='min')
+biggest_owners$landval_rank <- rank(-biggest_owners$LandVal, ties.method='min')
+biggest_owners$totalval_rank <- rank(-biggest_owners$totalVal, ties.method='min')
+write.csv(
+  biggest_owners, "C:/Users/ginge/Documents/PODER_Emma/Results/biggest_owners_commercial_vacant_residential_LLC.csv",
+  row.names=FALSE)
 
 # obsolete snippets
 # isolate class codes appearing in Emma
-class_codes <- read.csv("D:/PODER_Emma/Property_values/Buncombe_class_codes.csv")
+class_codes <- read.csv("C:/Users/ginge/Documents/PODER_Emma/Property_values/Buncombe_class_codes.csv")
 parcels_Emma <- merge(
   parcels_df, class_codes, by.x='Class', by.y='CODE', all.x=TRUE)
 class_codes_Emma <- parcels_Emma[
   !duplicated(parcels_Emma$Class), c('Class', 'Description', 'Ginger_class')]
 # class codes appearing in Emma, most inclusive parcel list (intersects 0.25 mile buffer)
-write.csv(class_codes_Emma, "D:/PODER_Emma/Property_values/Emma_unique_class_codes.csv")
+write.csv(class_codes_Emma, "C:/Users/ginge/Documents/PODER_Emma/Property_values/Emma_unique_class_codes.csv")
 
 # change in quartile bins of residential values over time
 df_list = list()
@@ -241,4 +280,4 @@ quant_allyears_df <- data.frame(
   '2005-2017'=quantile(residential_vals$total_val, probs=c(0.25, 0.5, 0.75, 1)))
 df_list[['allyears']] <- quant_allyears_df
 combined_df <- do.call(cbind, df_list)
-write.csv(combined_df, "D:/PODER_Emma/Results/total_val_quantiles_residential_by_year.csv")
+write.csv(combined_df, "C:/Users/ginge/Documents/PODER_EmmaResults/total_val_quantiles_residential_by_year.csv")
