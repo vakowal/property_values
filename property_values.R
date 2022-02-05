@@ -1,23 +1,5 @@
 # Data analysis for PODER Emma
-library(ggplot2)
-library(dplyr)
 
-summ_fun <- function(x) {
-  c(min = min(x), max = max(x),
-    mean = mean(x), median = median(x),
-    std = sd(x), count=length(x))
-}
-
-relative_to_2005 <- function(df) {
-  for (metric in c('min', 'max', 'mean', 'median', 'std')) {
-    baseline_val <- df[df$TaxYear == 2005, metric]
-    yearly_vals <- df[, metric]
-    change_vec <- (yearly_vals - baseline_val) / abs(baseline_val) * 100
-    new_col_name <- paste('perc_change_', metric, sep='')
-    df[, new_col_name] <- change_vec
-  }
-  return(df)
-}
 
 # years when properties were appraised (values in other years are the same, or reflect sale)
 appraisal_years <- c(2017, 2013, 2009, 2005)
@@ -55,23 +37,26 @@ residential_parcels <- parcels_codes[
   parcels_codes$Ginger_class == 'residential', 'PIN']
 residential_vals <- values_subs[values_subs$PIN %in% residential_parcels, ]
 
-# change in number of parcels in overall quantile bins
-bins <- quantile(residential_vals$total_val, probs=c(0.25, 0.5, 0.75, 1))
+# change in number of parcels in bins defined by HUD affordable housing definitions for Buncombe
+# HUD income and housing affordability data in this spreadsheet here:
+# https://docs.google.com/spreadsheets/d/1y34G2pcEYJn3iwk071wHLL__ImYuxq_Ncqsd9UrIg6A/edit?usp=sharing
+# bins <- quantile(residential_vals$total_val, probs=c(0.25, 0.5, 0.75, 1))
+bins <- c(70980, 101400, 162240, 23100000) # 23100000 = maximum residential value in 2019
 df_list = list()
 for(year in appraisal_years) {
-  q1 <- length(values_subs[
-    (values_subs$TaxYear == year) &
-      (values_subs$total_val <= bins[1]), 'PIN'])
-  q2 <- length(values_subs[
-    (values_subs$TaxYear == year) &
-      (values_subs$total_val <= bins[1]), 'PIN'])
-  q3 <- length(values_subs[
-    (values_subs$TaxYear == year) &
-      (values_subs$total_val > bins[2]) &
-      (values_subs$total_val <= bins[3]), 'PIN'])
-  q4 <- length(values_subs[
-    (values_subs$TaxYear == year) &
-      (values_subs$total_val > bins[3]), 'PIN'])
+  q1 <- length(residential_vals[
+    (residential_vals$TaxYear == year) &
+      (residential_vals$total_val <= bins[1]), 'PIN'])
+  q2 <- length(residential_vals[
+    (residential_vals$TaxYear == year) &
+      (residential_vals$total_val <= bins[1]), 'PIN'])
+  q3 <- length(residential_vals[
+    (residential_vals$TaxYear == year) &
+      (residential_vals$total_val > bins[2]) &
+      (residential_vals$total_val <= bins[3]), 'PIN'])
+  q4 <- length(residential_vals[
+    (residential_vals$TaxYear == year) &
+      (residential_vals$total_val > bins[3]), 'PIN'])
   df <- data.frame(
     'q1'=q1, 'q2'=q2, 'q3'=q3, 'q4'=q4, 'year'=year)
   df_list[[paste(year)]] <- df
@@ -84,22 +69,23 @@ num_prop_df <- reshape(
 
 num_prop_df$Parcel_value <- factor(
   num_prop_df$quartile, levels=c('q4', 'q3', 'q2', 'q1'),
-  labels=c('Highest ($147,300 - $23,100,000)', 'High ($100,300 - $147,300)',
-           'Low ($53,100 - $100,300)', 'Lowest ($0 - $53,100)'))
+  labels=c('Not Low Income ($162,240 - $23,100,000)', 'Low Income ($101,400 - $162,240)',
+           'Very Low Income ($70,980 - $101,400)', 'Extremely Low Income ($0 - $70,980)'))
 p <- ggplot(num_prop_df, aes(fill=Parcel_value, y=num, x=year))
 p <- p + geom_bar(position="fill", stat="identity")  # position="stack" for number, position="fill" for percent
 p <- p + xlab("Year") + ylab("% parcels")  # "# parcels"
 p <- p + scale_x_continuous(breaks=c(2005, 2009, 2013, 2017))
 print(p)
-pngname <- "C:/Users/ginge/Documents/PODER_Emma/Results/percent_residential_parcel_in_quantile_by_year.png"
-png(filename=pngname, width=5, height=3, units='in', res=300)
+pngname <- "C:/Users/ginge/Documents/PODER_Emma/Results/percent_residential_parcel_by_HUD_limits_by_year.png"
+png(filename=pngname, width=6, height=3, units='in', res=300)
 print(p)
 dev.off()
 
 # calculate change in average parcel value, for different residential categories
 parcels_codes <- merge(parcels_subs, codes_df, by='Class')
-residential_parcels <- parcels_codes[
-  parcels_codes$Ginger_class == 'residential', 'PIN']
+residential_parcels <- subset(
+  parcels_codes, Ginger_class == 'residential', select=PIN)$PIN
+
 residential_vals <- values_subs[values_subs$PIN %in% residential_parcels, ]
 residential_vals_codes <- merge(residential_vals, parcels_codes, by='PIN')
 mean_by_taxyear_class <- group_by(
@@ -107,7 +93,7 @@ mean_by_taxyear_class <- group_by(
   summarize(mean_total_val = mean(total_val, na.rm=TRUE))
 df_list <- list()
 for(class in mean_by_taxyear_class$Class) {
-  if(class == 120) {
+  if(class %in% c(120, 312, 635, 301, 173, 311)) {  # skip condos, 'low income housing', and non-dwelling categories
     next
   }
   years <- filter(mean_by_taxyear_class, Class == class) %>%
@@ -124,22 +110,36 @@ for(class in mean_by_taxyear_class$Class) {
 }
 change_df <- do.call(rbind, df_list)
 change_df <- merge(change_df, codes_df)
-num_by_class <- group_by(
-  residential_vals_codes, TaxYear, Description) %>%
-  summarize(num=n()) %>%
-  group_by(Description) %>%
-  summarize(mean_num=mean(num, na.rm=TRUE))
-num_by_class <- num_by_class[num_by_class$Description != 'CONDO', ]
+# num_by_class <- group_by(
+#   residential_vals_codes, TaxYear, Description) %>%
+#   summarize(num=n()) %>%
+#   group_by(Description) %>%
+#   summarize(mean_num=mean(num, na.rm=TRUE))
+# num_by_class <- num_by_class[
+#   (num_by_class$Description != 'CONDO') &
+#   () &
+#   () &
+#   (), ]
 
 p <- ggplot(change_df, aes(x=TaxYear, y=percent_change_from_2005))
 p <- p + geom_point() + facet_wrap(~Description, scales='free')
-p <- p + geom_text(data=num_by_class, aes(x=2014, y=0, label=mean_num))
+# p <- p + geom_text(data=num_by_class, aes(x=2014, y=0, label=mean_num))
 p <- p + scale_x_continuous(breaks=c(2005, 2013))
 p <- p + ylab("Percent change from 2005")
 pngname <- "C:/Users/ginge/Documents/PODER_EmmaResults/percent_change_total_val_residential_by_type.png"
 png(filename=pngname, width=7, height=6, units='in', res=300)
 print(p)
 dev.off()
+
+# look at change for mobile home parks with >= 3 units: what's driving this trend?
+mh_parks <- subset(residential_vals_codes, Class == 416)
+
+res_values <- subset(residential_vals_codes, Class == 100 | Class == 101)
+# extract residential parcels values with a value in 2005
+res_parcels_2005 <- subset(res_values, TaxYear == 2005, select=PIN)$PIN
+res_values_since_2005 <- subset(res_values, PIN %in% res_parcels_2005)
+write.csv(res_values_since_2005, "C:/Users/ginge/Desktop/res_values.csv")
+# NEXT continue here
 
 # calculate percent change in value for building and land separately
 # land value only
