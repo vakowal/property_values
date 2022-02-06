@@ -101,3 +101,40 @@ pngname <- paste0(wd$output, "percent_change_total_val_residential_by_type_fixed
 png(filename=pngname, width=7, height=6, units='in', res=300)
 print(p)
 dev.off()
+
+# change in land value per acre
+residential_vals$landval_per_acre <- residential_vals$LandVal / residential_vals$Acres
+mean_by_taxyear_class <- group_by(
+  residential_vals, TaxYear, Description) %>%
+  summarize(mean_land_val_per_acre = mean(landval_per_acre, na.rm=TRUE))
+df_list <- list()
+leave_out_list <- c(
+  'CONDO', 'LOW I/C HOUSING', 'NON-DWG IMPV', 'TOWNHOME',
+  'SUBSTANDARD LOT', 'PP MH(S) OR SITE', 'RES BLDG LOT')  # skip townhomes for val per acre
+for(desc in mean_by_taxyear_class$Description) {
+  if(desc %in% leave_out_list) {
+    next
+  }
+  years <- filter(mean_by_taxyear_class, Description == desc) %>%
+    pull(TaxYear)
+  baseline_val <- filter(
+    mean_by_taxyear_class, TaxYear == 2005 & Description == desc) %>%
+    pull(mean_land_val_per_acre)
+  yearly_vals <- filter(mean_by_taxyear_class, Description == desc) %>%
+    pull(mean_land_val_per_acre)
+  change_vec <- (yearly_vals - baseline_val) / abs(baseline_val) * 100
+  df <- data.frame('TaxYear'=years, 'percent_change_from_2005'=change_vec)
+  df$Description <- desc
+  df_list[[desc]] <- df
+}
+landval_per_acre_change_df <- do.call(rbind, df_list)
+
+p <- ggplot(landval_per_acre_change_df, aes(x=TaxYear, y=percent_change_from_2005))
+p <- p + geom_point() + geom_line() + facet_wrap(~Description)  #, scales='free')
+p <- p + scale_x_continuous(breaks=c(2005, 2013))
+p <- p + ylab("Percent change from 2005")
+print(p)
+pngname <- paste0(wd$output, "percent_change_landval_per_acre_residential_by_type_fixedy.png")
+png(filename=pngname, width=5.5, height=4, units='in', res=300)
+print(p)
+dev.off()
