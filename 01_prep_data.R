@@ -41,7 +41,7 @@ write.csv(
 join_df <- read.csv(paste0(wd$processed_data, "parcels_zoning_intersection.csv"))
 parcel_area_df <- join_df[!duplicated(join_df$PIN), c('PIN', 'par_area')]
 
-# Join zoning data with parcel data
+# Join zoning data with parcel use data
 # identify parcels well covered by zoning data
 # criteria: >=80% covered by zoning data
 sum_by_parcel <- group_by(
@@ -61,6 +61,7 @@ perc_calc$perc_of_parcel_area <- perc_calc$sum_code_area / perc_calc$par_area
 unambiguous_code <- perc_calc[perc_calc$perc_of_parcel_area > 0.73, c('PIN', 'ZoningCode')]
 
 parcel_code_df <- merge(well_covered_by_zoning, unambiguous_code, all=FALSE)
+parcels_class_zoning <- merge(parcel_code_df, parcels_Emma_with_class_codes, all=TRUE)
 write.csv(
-  parcel_code_df, paste0(wd$processed_data, 'Emma_parcels_join_zoning_code_2021.csv'),
+  parcels_class_zoning, paste0(wd$processed_data, 'Emma_parcels_join_zoning_code_2021.csv'),
   row.names=FALSE)

@@ -4,6 +4,27 @@
 # Ginger Kowal February 2022
 #####################################
 
+source("C:/Users/ginge/Documents/Python/property_values/scripts/00_packages_functions.R")
+
+# identify vacant land zoned for mobile homes
+Emma_parcels_zone_codes <- read.csv(
+  paste0(wd$processed_data, 'Emma_parcels_join_zoning_code_2021.csv'))
+# parcels in Emma that are vacant, zoned for manufactured home parks
+vacant_mfg_park <- subset(
+  Emma_parcels_zone_codes,
+  (Ginger_class == 'vacant' & (ZoningCode == 'R-3' | ZoningCode == 'OU')))
+# join with parcel data to get owner, etc
+parcels_df <- read.csv(paste0(wd$raw_data, "Parcels_by_intersection_Emma_and_buffer.csv"))
+vacant_mfg_park_info <- merge(vacant_mfg_park, parcels_df, all.x=TRUE)
+cols_to_keep <- c(
+  'PIN', 'Class', 'ZoningCode', 'Description', 'Owner', 'HouseNumbe', 'StreetName',
+  'StreetType', 'Acreage', 'CareOf', 'Address', 'CityName', 'State', 'Zipcode',
+  'TaxValue', 'PropCard')
+vacant_mfg_park_info <- vacant_mfg_park_info[, cols_to_keep]
+write.csv(
+  vacant_mfg_park_info, paste0(wd$output, 'Emma_vacant_zoned_mobile_home_parks.csv'),
+  row.names=FALSE)
+
 # top 10 owners of property in Emma, by area
 # properties within Emma proper, no buffer (2156 parcels)
 # TODO move this into 01_prep_data.R
